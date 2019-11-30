@@ -60,6 +60,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.common.SolrInputDocument;
+import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.RequestOptions;
@@ -799,6 +800,25 @@ public final class IndexCollection {
     }
 
     if (args.es) {
+      RestHighLevelClient esClient = null;
+      try {
+        esClient = esPool.borrowObject();
+        if (!args.dryRun) {
+          // synchronous
+          // TODO parse the response returned by this
+          esClient.indices().refresh(new RefreshRequest(args.esIndex), RequestOptions.DEFAULT);
+        }
+      } catch (Exception e) {
+        LOG.error("Error refreshing index after indexing.", e);
+      } finally {
+        if (esClient != null) {
+          try {
+            esPool.returnObject(esClient);
+          } catch (Exception e) {
+            LOG.error("Error returning ES client to pool", e);
+          }
+        }
+      }
       esPool.close();
     }
 
